@@ -1,5 +1,5 @@
 # Ignore everything
-*
+# *
 
 # Don't ignore .git* files
 !.gitignore
@@ -20,3 +20,11 @@
 !*.yml
 Chaos - Renegade Militarum.cat
 Zephyran Corsairs.cat
+
+# Dont ignore rust utils
+!**/*.rs
+!**/*.toml
+!**/*.lock
+
+# Dont ignore utils
+!utils/
