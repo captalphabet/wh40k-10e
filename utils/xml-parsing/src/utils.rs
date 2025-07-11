@@ -1,10 +1,10 @@
-use std::fs::File;
+use regex::Regex;
 use std::collections::HashMap;
-use tracing::{info};
+use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
-use regex::Regex;
-
+use thiserror::Error;
+use tracing::info;
 
 pub fn read_xml_file<T>(path: T) -> std::io::Result<String>
 where
@@ -18,7 +18,6 @@ where
     Ok(output)
 }
 
-
 pub fn _walk_tree(data: &str) {
     // walk each <> tag irregardless if closing
     let tag_pattern = Regex::new(r"<.+>").unwrap();
@@ -29,7 +28,6 @@ pub fn _walk_tree(data: &str) {
     let mut num_closers = 0;
     let mut unparsed_tags = 0;
 
-
     tag_pattern
         .find_iter(data)
         .map(|found_tag| {
@@ -37,79 +35,68 @@ pub fn _walk_tree(data: &str) {
 
             if tag_str.starts_with("</") {
                 if _handle_closing_tag(tag_str).is_some() {
-                    num_closers +=1;
-
-                }
-                else {
-                    unparsed_tags +=1;
-                    info!("Unparsed Tag: {}",tag_str);
+                    num_closers += 1;
+                } else {
+                    unparsed_tags += 1;
+                    info!("Unparsed Tag: {}", tag_str);
                 }
             } else {
                 if _handle_opening_tag(tag_str).is_some() {
-                    num_openers +=1;
+                    num_openers += 1;
                 } else {
-                    unparsed_tags +=1;
-                    info!("Unparsed Tag: {}",tag_str);
+                    unparsed_tags += 1;
+                    info!("Unparsed Tag: {}", tag_str);
                 }
             };
-
-
-
-        }).for_each(drop);
-    info!("Number of unparded tags: {:?}",unparsed_tags);
-    info!("Number of parsed opener tags: {:?}",num_openers);
-    info!("Number of parsed closer tags: {:?}",num_closers);
+        })
+        .for_each(drop);
+    info!("Number of unparded tags: {:?}", unparsed_tags);
+    info!("Number of parsed opener tags: {:?}", num_openers);
+    info!("Number of parsed closer tags: {:?}", num_closers);
 }
-
 
 fn _handle_opening_tag(tag: &str) -> Option<Tag> {
     let pattern = Regex::new(r"<(\w+) ?(.*)>").unwrap();
-    let disassembled_opt = pattern
-        .captures(tag)
-        .map(|cap| {
-            let (_, [tag_name, metadata]) = cap.extract();
+    let disassembled_opt = pattern.captures(tag).map(|cap| {
+        let (_, [tag_name, metadata]) = cap.extract();
 
-            (tag_name, metadata)
-        });
-
+        (tag_name, metadata)
+    });
 
     // disassembled_opt
 
     let meta_pattern = Regex::new(r#"(\w+)\s*=\s*(?:\"(.*?)\"|'(.*?)'|(\w+))"#).unwrap();
-    
-    disassembled_opt.map(|(tagname,metadata_str)| {
-        let meta_data = meta_pattern.captures_iter(metadata_str).map(|cap| {
-            let (_,[key,val]) = cap.extract();
 
-            (key,val)
-        }).collect();
+    disassembled_opt.map(|(tagname, metadata_str)| {
+        let meta_data = MetaData {
+            map: meta_pattern
+                .captures_iter(metadata_str)
+                .map(|cap| {
+                    let (_, [key, val]) = cap.extract();
 
-        Tag { name: tagname.to_string(), metadata: Some(meta_data) } // Return Option<Tag>
+                    (key, val)
+                })
+                .collect(),
+        };
+
+        Tag {
+            name: tagname.to_string(),
+            metadata: Some(meta_data),
+        } // Return Option<Tag>
     })
-
-
-
-
-
-
-
-
 }
 
 fn _handle_closing_tag(tag: &str) -> Option<Tag> {
     let pattern = Regex::new(r"</(\w+).*>").unwrap();
 
     pattern.captures(tag).map(|cap| {
-        let (_,[tag_name]) = cap.extract();
+        let (_, [tag_name]) = cap.extract();
 
         Tag {
             name: tag_name.to_string(),
-            metadata: None
+            metadata: None,
         }
-
-
     })
-
 }
 
 fn _parse_tag_open(data: &str) -> Vec<Tag> {
@@ -140,7 +127,7 @@ fn _parse_tag_open(data: &str) -> Vec<Tag> {
                 })
                 .collect();
 
-            Some(meta_matches)
+            Some(MetaData { map: meta_matches })
         } else {
             None
         };
@@ -152,7 +139,8 @@ fn _parse_tag_open(data: &str) -> Vec<Tag> {
 
         println!("{:?}", tag.name);
         if let Some(hm) = &tag.metadata {
-            hm.iter()
+            hm.map
+                .iter()
                 .for_each(|(k, v)| println!("Key: {:?}, Val: {:?}", *k, *v));
         }
 
@@ -162,7 +150,42 @@ fn _parse_tag_open(data: &str) -> Vec<Tag> {
     parsed_openers
 }
 
-type OptMetaData<'a> = Option<HashMap<&'a str, &'a str>>;
+pub type OptMetaData<'a> = Option<MetaData<'a>>;
+
+#[derive(Debug, Error)]
+pub enum TagParseError {
+    #[error("Failed to Parse tag metadata: {0}")]
+    TagMetaDataKind(String),
+}
+
+#[derive(Debug)]
+struct MetaData<'a> {
+    map: HashMap<&'a str, &'a str>,
+}
+
+impl<'a> MetaData<'a> {
+    // Meta Data String has had name already parsed out
+    pub fn try_parse<T: AsRef<str>>(value: &'a T) -> Result<Self, TagParseError> {
+        let input_str = value.as_ref();
+
+        if input_str.is_empty() {
+            return Err(TagParseError::TagMetaDataKind("Input is empty".to_string()));
+        }
+
+        let it1 = input_str
+            .split_whitespace()
+            .filter(|split| *split!="=")
+            .map(|split|         split.trim_matches('='));
+        let it2 = it1.clone().skip(1);
+
+
+            
+        let map: HashMap<&'a str, &'a str> = it1.zip(it2).map(|v| v).collect();
+            
+
+        Ok(MetaData { map })
+    }
+}
 
 #[derive(Debug)]
 pub struct Tag<'a> {

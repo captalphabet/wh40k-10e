@@ -1,4 +1,4 @@
-use crate::utils::Tag;
+use crate::utils::{Tag,OptMetaData};
 
 // Manually parse tags, Regex is slow
 //
@@ -40,25 +40,42 @@ enum TagType {
     SelfClose,
 }
 
-fn check_tag_type(tag_str: &str) -> TagType {
-    if tag_str.starts_with('/') {
-        TagType::Close
-    } else if tag_str.ends_with("/") {
-        TagType::SelfClose
-    } else {
-        TagType::Open
+impl TagType {
+    fn check_tag_type(tag_str: &str) -> TagType {
+        if tag_str.starts_with('/') {
+            TagType::Close
+        } else if tag_str.ends_with("/") {
+            TagType::SelfClose
+        } else {
+            TagType::Open
+        }
     }
 }
 
-fn parse_tag_data(tag_str: &str, typing: TagType) -> (Tag, TagType) {
-    match typing {
-        Open => {
-            // Needs to parse name out and metadata
-            let mut tag_content_iter = tag_str.split_whitespace();
-            let tag_name = tag_content_iter.next().unwrap_or("NoName");
-            let meta_data_vec = tag_content_iter.collect::<Vec<_>>();
+impl<'a,T> From<&'a T> for Tag<'a>
+where T: AsRef<str> {
+    fn from(value: &'a T) -> Self {
+        let tag_str = value.as_ref();
+        if let Some((name,meta_data)) = tag_str.split_once(' ') {
+
         }
-        Close => {}
-        SelfClose => {}
+
+
+        
     }
+
 }
+
+
+// fn parse_tag_data(tag_str: &str, typing: TagType) -> (Tag, TagType) {
+//     match typing {
+//         Open => {
+//             // Needs to parse name out and metadata
+//             let mut tag_content_iter = tag_str.split_whitespace();
+//             let tag_name = tag_content_iter.next().unwrap_or("NoName");
+//             let meta_data_vec = tag_content_iter.collect::<Vec<_>>();
+//         }
+//         Close => {}
+//         SelfClose => {}
+//     }
+// }
