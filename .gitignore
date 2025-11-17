@@ -10,7 +10,21 @@
 !*.gst
 
 # Don't ignore docs
+!docs/
+!docs/**
 !*.md
+
+<<<<<<< ours
+# Don't ignore tooling
+!tools/
+!tools/**
+=======
+# Simulation utilities
+!/sim
+!/sim/**
+sim/__pycache__/
+
+>>>>>>> theirs
 
 # Don't ignore github files
 !/.github
